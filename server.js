@@ -12,7 +12,7 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-    origin: '*', // Restrict to your React app’s origin
+    origin: allowedOrigins, // Restrict to your React app’s origin
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
