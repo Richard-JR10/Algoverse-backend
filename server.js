@@ -13,38 +13,12 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: allowedOrigins, // Restrict to your React app’s origin
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json()); // Parse JSON bodies
 app.use(verifyUserToken); // Apply admin token verification globally
-
-app.post('/api/addLibrary', verifyAdminToken, async (req, res) => {
-    const { title, category, description, code} = req.body;
-
-    if (!title || !category || !description || !code) {
-        return res.status(400).json({ error: 'All fields are required' });
-    }
-
-    try {
-        const docRef = await db.collection('codeLibrary').add({
-            title,
-            category,
-            description,
-            code,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        res.status(201).json({
-            message: 'Code entry added successfully',
-            id: docRef.id,
-        });
-    } catch (error) {
-        console.error('Error adding code entry:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-})
 
 // Fetch all users
 app.get('/api/users', verifyAdminToken, async (req, res) => {
@@ -163,6 +137,62 @@ app.get('/api/library', async (req, res) => {
         res.status(200).json(codeEntries);
     } catch (error) {
         console.error('Error fetching code entries:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+app.post('/api/addLibrary', verifyAdminToken, async (req, res) => {
+    const { title, category, description, codeData} = req.body;
+
+    if (!title || !category || !description || !codeData) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (!Array.isArray(codeData)) {
+        return res.status(400).json({ error: 'codeData must be an array' });
+    }
+
+    try {
+        const docRef = await db.collection('codeLibrary').add({
+            title,
+            category,
+            description,
+            codeData,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        res.status(201).json({
+            message: 'Code entry added successfully',
+            id: docRef.id,
+        });
+    } catch (error) {
+        console.error('Error adding code entry:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+})
+
+
+
+// delete library data
+app.delete('/api/library/delete', verifyAdminToken, async (req, res) => {
+    const { id } = req.body;
+    if (!id || !Array.isArray(id) || id.length === 0) {
+        return res.status(400).json({ error: 'id array is required' });
+    }
+
+    try {
+        const batch = db.batch();
+
+        id.forEach((docId) => {
+            const docRef = db.collection('codeLibrary').doc(docId);
+            batch.delete(docRef);
+        })
+
+        await batch.commit();
+
+        res.status(200).json({ message: `Deleted ${id.length} library items successfully` });
+    } catch (error) {
+        console.error('Error deleting id:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
