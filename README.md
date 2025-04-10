@@ -5,7 +5,7 @@ Follow these steps to set up AlgoVerse on your local machine:
 1. **Clone the Repository**:
    ```bash
    git clone https://github.com/Richard-JR10/Algoverse-backend.git
-   cd algoverse
+   cd Algoverse-backend
    ```
 
 2. **Install Dependencies**:
