@@ -8,17 +8,17 @@ const port = 3000;
 const db = admin.firestore();
 
 const allowedOrigins = [
-    'http://localhost:5173',    // React dev server
+    'http://localhost:5173',
 ];
 
 app.use(cors({
-    origin: allowedOrigins, // Restrict to your React app’s origin
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-app.use(express.json()); // Parse JSON bodies
-app.use(verifyUserToken); // Apply admin token verification globally
+app.use(express.json());
+app.use(verifyUserToken);
 
 // Fetch all users
 app.get('/api/users', verifyAdminToken, async (req, res) => {
@@ -126,7 +126,7 @@ app.get('/api/library', async (req, res) => {
     try {
         const snapshot = await db.collection('codeLibrary').get();
         if (snapshot.empty) {
-            return res.status(200).json([]); // Return empty array if no entries
+            return res.status(200).json([]);
         }
 
         const codeEntries = snapshot.docs.map(doc => ({
