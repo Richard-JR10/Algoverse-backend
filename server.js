@@ -13,7 +13,7 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: allowedOrigins,
-    methods: ['GET', 'POST', 'OPTIONS', 'DELETE'],
+    methods: ['GET', 'POST', 'OPTIONS', 'DELETE', 'PUT'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
@@ -122,6 +122,7 @@ app.post('/api/users/set-admin', verifyAdminToken,  async (req, res) => {
     }
 })
 
+// fetch all library data
 app.get('/api/library', async (req, res) => {
     try {
         const snapshot = await db.collection('codeLibrary').get();
@@ -141,6 +142,7 @@ app.get('/api/library', async (req, res) => {
     }
 });
 
+// add library
 app.post('/api/addLibrary', verifyAdminToken, async (req, res) => {
     const { title, category, description, codeData} = req.body;
 
@@ -171,6 +173,51 @@ app.post('/api/addLibrary', verifyAdminToken, async (req, res) => {
     }
 })
 
+app.put('/api/updateLibrary', verifyAdminToken,  async (req, res) => {
+    const { id, title, category, description, codeData } = req.body;
+
+    if (!id) {
+        console.error('Document ID is required')
+        return res.status(400).json({ error: 'Document ID is required' });
+    }
+
+    if (!title || !category || !description || !codeData) {
+        console.error('All fields are required')
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (!Array.isArray(codeData)) {
+        console.error('codeData must be an array')
+        return res.status(400).json({ error: 'codeData must be an array' });
+    }
+
+    try {
+        // Check if the document exists first
+        const docRef = db.collection('codeLibrary').doc(id);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        // Update the document
+        await docRef.update({
+            title,
+            category,
+            description,
+            codeData,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        res.status(200).json({
+            message: 'Code entry updated successfully',
+            id
+        });
+    } catch (error) {
+        console.error('Error updating code entry:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+})
 
 
 // delete library data
@@ -191,6 +238,129 @@ app.delete('/api/library/delete', verifyAdminToken, async (req, res) => {
         await batch.commit();
 
         res.status(200).json({ message: `Deleted ${id.length} library items successfully` });
+    } catch (error) {
+        console.error('Error deleting id:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// fetch all example data
+app.get('/api/example', async (req, res) => {
+    try {
+        const snapshot = await db.collection('example').get();
+        if (snapshot.empty) {
+            return res.status(200).json([]);
+        }
+
+        const codeEntries = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+
+        res.status(200).json(codeEntries);
+    } catch (error) {
+        console.error('Error fetching example data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// add example
+app.post('/api/addExample', verifyAdminToken, async (req, res) => {
+    const { title, category, description, exampleData} = req.body;
+
+    if (!title || !category || !description || !exampleData) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (!Array.isArray(exampleData)) {
+        return res.status(400).json({ error: 'exampleData must be an array' });
+    }
+
+    try {
+        const docRef = await db.collection('example').add({
+            title,
+            category,
+            description,
+            exampleData,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        res.status(201).json({
+            message: 'Example entry added successfully',
+            id: docRef.id,
+        });
+    } catch (error) {
+        console.error('Error adding Example entry:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+})
+
+//update example
+app.put('/api/updateExample', verifyAdminToken,  async (req, res) => {
+    const { id, title, category, description, exampleData } = req.body;
+
+    if (!id) {
+        console.error('Document ID is required')
+        return res.status(400).json({ error: 'Document ID is required' });
+    }
+
+    if (!title || !category || !description || !exampleData) {
+        console.error('All fields are required')
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (!Array.isArray(exampleData)) {
+        console.error('codeData must be an array')
+        return res.status(400).json({ error: 'exampleData must be an array' });
+    }
+
+    try {
+        // Check if the document exists first
+        const docRef = db.collection('example').doc(id);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        // Update the document
+        await docRef.update({
+            title,
+            category,
+            description,
+            exampleData,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        res.status(200).json({
+            message: 'Example data updated successfully',
+            id
+        });
+    } catch (error) {
+        console.error('Error updating example data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+})
+
+
+// delete example data
+app.delete('/api/deleteExample', verifyAdminToken, async (req, res) => {
+    const { id } = req.body;
+    if (!id || !Array.isArray(id) || id.length === 0) {
+        return res.status(400).json({ error: 'id array is required' });
+    }
+
+    try {
+        const batch = db.batch();
+
+        id.forEach((docId) => {
+            const docRef = db.collection('example').doc(docId);
+            batch.delete(docRef);
+        })
+
+        await batch.commit();
+
+        res.status(200).json({ message: `Deleted ${id.length} example items successfully` });
     } catch (error) {
         console.error('Error deleting id:', error);
         res.status(500).json({ error: 'Internal server error' });
