@@ -266,14 +266,14 @@ app.get('/api/example', async (req, res) => {
 
 // add example
 app.post('/api/addExample', verifyAdminToken, async (req, res) => {
-    const { title, category, description, exampleData} = req.body;
+    const { title, category, description, examples} = req.body;
 
-    if (!title || !category || !description || !exampleData) {
+    if (!title || !category || !description || !examples) {
         return res.status(400).json({ error: 'All fields are required' });
     }
 
-    if (!Array.isArray(exampleData)) {
-        return res.status(400).json({ error: 'exampleData must be an array' });
+    if (!Array.isArray(examples)) {
+        return res.status(400).json({ error: 'examples must be an array' });
     }
 
     try {
@@ -281,7 +281,7 @@ app.post('/api/addExample', verifyAdminToken, async (req, res) => {
             title,
             category,
             description,
-            exampleData,
+            examples,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
