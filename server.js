@@ -9,6 +9,7 @@ const db = admin.firestore();
 
 const allowedOrigins = [
     'http://localhost:5173',
+    'https://algoverse1.netlify.app'
 ];
 
 app.use(cors({
