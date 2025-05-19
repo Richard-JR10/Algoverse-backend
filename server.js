@@ -368,6 +368,183 @@ app.delete('/api/deleteExample', verifyAdminToken, async (req, res) => {
     }
 });
 
+// fetch all challenges data
+app.get('/api/challenges', async (req, res) => {
+    try {
+        const snapshot = await db.collection('challenges').get();
+        if (snapshot.empty) {
+            return res.status(200).json([]);
+        }
+
+        const codeEntries = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+
+        res.status(200).json(codeEntries);
+    } catch (error) {
+        console.error('Error fetching example data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Add challenges
+app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
+    const { title, category, questions, type, difficulty } = req.body;
+
+    // Validate request body
+    if (!title || typeof title !== 'string' || title.trim() === '') {
+        return res.status(400).json({ error: 'Title is required and must be a non-empty string' });
+    }
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+        return res.status(400).json({ error: 'Request body must include a non-empty questions array' });
+    }
+    if (!type || ![1, 2, 3].includes(type)) {
+        return res.status(400).json({ error: 'Type is required and must be 1, 2, or 3' });
+    }
+    if (!difficulty || !['Easy', 'Medium', 'Hard'].includes(difficulty)) {
+        return res.status(400).json({ error: 'Difficulty is required and must be Easy, Medium, or Hard' });
+    }
+    if (!category || !['Sorting', 'Search', 'Graph Traversal', 'Recursion'].includes(category)) {
+        return res.status(400).json({ error: 'Category is required and must be Sorting, Search, Graph Traversal, or Recursion' });
+    }
+
+    // Validate each question
+    for (const challenge of questions) {
+        // Type-specific validation
+        if (type === 1) {
+            const { question, answer, choices } = challenge;
+            if (!question || !answer || !choices || !Array.isArray(choices) || choices.length !== 4) {
+                return res.status(400).json({ error: 'Multiple Choices requires question, answer, and exactly 4 choices' });
+            }
+        } else if (type === 2) {
+            const { algorithm, initialArray, expectedArray, stepDescription, explanation } = challenge;
+            if (
+                !algorithm ||
+                !initialArray ||
+                !expectedArray ||
+                !stepDescription ||
+                !explanation ||
+                !Array.isArray(initialArray) ||
+                !Array.isArray(expectedArray)
+            ) {
+                return res.status(400).json({
+                    error: 'Sorting Arrangement requires algorithm, initialArray, expectedArray, stepDescription, and explanation, with arrays for initialArray and expectedArray',
+                });
+            }
+        } else if (type === 3) {
+            const { text, correctAnswers, choices, explanation } = challenge;
+            if (
+                !text ||
+                !correctAnswers ||
+                !choices ||
+                !explanation ||
+                !Array.isArray(correctAnswers) ||
+                correctAnswers.length !== 2 ||
+                !Array.isArray(choices) ||
+                choices.length !== 4
+            ) {
+                return res.status(400).json({
+                    error: 'Fill In The Blanks requires text, exactly 2 correctAnswers, exactly 4 choices, and explanation',
+                });
+            }
+        }
+    }
+
+    try {
+        // Store all data in a single document
+        const docRef = await admin.firestore().collection('challenges').add({
+            title,
+            category,
+            questions,
+            type,
+            difficulty,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        res.status(201).json({
+            message: 'Challenges added successfully',
+            id: docRef.id,
+        });
+    } catch (error) {
+        console.error('Error adding challenges:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+//update challenges
+app.put('/api/updateChallenges', verifyAdminToken,  async (req, res) => {
+    const { id, title, category, type, difficulty, questions } = req.body;
+
+    if (!id) {
+        console.error('Document ID is required')
+        return res.status(400).json({ error: 'Document ID is required' });
+    }
+
+    if (!title || !category || !type || !difficulty || !questions) {
+        console.error('All fields are required')
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    if (!Array.isArray(questions)) {
+        console.error('Questions must be an array')
+        return res.status(400).json({ error: 'Questions must be an array' });
+    }
+
+    try {
+        // Check if the document exists first
+        const docRef = db.collection('challenges').doc(id);
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        // Update the document
+        await docRef.update({
+            title,
+            category,
+            type,
+            difficulty,
+            questions,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        res.status(200).json({
+            message: 'Challenges data updated successfully',
+            id
+        });
+    } catch (error) {
+        console.error('Error updating challenges data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+})
+
+
+// delete challenges data
+app.delete('/api/deleteChallenges', verifyAdminToken, async (req, res) => {
+    const { id } = req.body;
+    if (!id || !Array.isArray(id) || id.length === 0) {
+        return res.status(400).json({ error: 'id array is required' });
+    }
+
+    try {
+        const batch = db.batch();
+
+        id.forEach((docId) => {
+            const docRef = db.collection('challenges').doc(docId);
+            batch.delete(docRef);
+        })
+
+        await batch.commit();
+
+        res.status(200).json({ message: `Deleted ${id.length} challenge items successfully` });
+    } catch (error) {
+        console.error('Error deleting id:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 })
