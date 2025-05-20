@@ -545,6 +545,143 @@ app.delete('/api/deleteChallenges', verifyAdminToken, async (req, res) => {
     }
 });
 
+// Complete a challenge and update userProgress
+app.post('/api/completeChallenge', async (req, res) => {
+    const { challengeId, points, answers, score } = req.body;
+    const userId = req.user.uid; // From verifyUserToken middleware
+
+    if (!challengeId || typeof challengeId !== 'string' || challengeId.trim() === '') {
+        return res.status(400).json({ error: 'challengeId is required and must be a non-empty string' });
+    }
+    if (points == null || typeof points !== 'number' || points < 0) {
+        return res.status(400).json({ error: 'points is required and must be a positive number' });
+    }
+    if (!Array.isArray(answers)) {
+        return res.status(400).json({ error: 'answers is required and must be an array' });
+    }
+    if (score == null || typeof score !== 'number' || score < 0) {
+        return res.status(400).json({ error: 'score is required and must be a non-negative number' });
+    }
+
+    try {
+        // Verify challenge exists
+        const challengeRef = db.collection('challenges').doc(challengeId);
+        const challengeSnap = await challengeRef.get();
+        if (!challengeSnap.exists) {
+            return res.status(404).json({ error: 'Challenge not found' });
+        }
+
+        const userProgressRef = db.collection('userProgress').doc(userId);
+        const userProgressSnap = await userProgressRef.get();
+
+        // Initialize document if it doesn't exist
+        if (!userProgressSnap.exists) {
+            await userProgressRef.set({
+                Points: 0,
+                SolvedChallenges: [],
+                retryCount: {},
+                challengeAttempts: {},
+            });
+        }
+
+        // Check for duplicate completion
+        const { SolvedChallenges = [] } = userProgressSnap.data() || {};
+        if (SolvedChallenges.includes(challengeId)) {
+            return res.status(200).json({ message: 'Challenge already completed, no points awarded' });
+        }
+
+        // Update Points, SolvedChallenges, and challengeAttempts
+        await userProgressRef.update({
+            Points: admin.firestore.FieldValue.increment(points),
+            SolvedChallenges: admin.firestore.FieldValue.arrayUnion(challengeId),
+            [`challengeAttempts.${challengeId}`]: { answers, score },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        res.status(200).json({ message: 'Challenge completed and user progress updated' });
+    } catch (error) {
+        console.error('Error updating user progress:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+
+//check user progress
+app.get('/api/userProgress', async (req, res) => {
+    const userId = req.user.uid;
+    try {
+        const userProgressRef = db.collection('userProgress').doc(userId);
+        const userProgressSnap = await userProgressRef.get();
+
+        if (!userProgressSnap.exists) {
+            return res.status(200).json({
+                Points: 0,
+                SolvedChallenges: [],
+                retryCount: {},
+                challengeAttempts: {},
+            });
+        }
+
+        const data = userProgressSnap.data();
+        res.status(200).json({
+            Points: data.Points || 0,
+            SolvedChallenges: data.SolvedChallenges || [],
+            retryCount: data.retryCount || {},
+            challengeAttempts: data.challengeAttempts || {},
+        });
+    } catch (error) {
+        console.error('Error fetching user progress:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Record a retry for a challenge
+app.post('/api/recordRetry', async (req, res) => {
+    const { challengeId, answers, score } = req.body;
+    const userId = req.user.uid;
+
+    if (!challengeId || typeof challengeId !== 'string' || challengeId.trim() === '') {
+        return res.status(400).json({ error: 'challengeId is required and must be a non-empty string' });
+    }
+    if (!Array.isArray(answers)) {
+        return res.status(400).json({ error: 'answers is required and must be an array' });
+    }
+    if (score == null || typeof score !== 'number' || score < 0) {
+        return res.status(400).json({ error: 'score is required and must be a non-negative number' });
+    }
+
+    try {
+        const challengeRef = db.collection('challenges').doc(challengeId);
+        const challengeSnap = await challengeRef.get();
+        if (!challengeSnap.exists) {
+            return res.status(404).json({ error: 'Challenge not found' });
+        }
+
+        const userProgressRef = db.collection('userProgress').doc(userId);
+        const userProgressSnap = await userProgressRef.get();
+
+        if (!userProgressSnap.exists) {
+            return res.status(400).json({ error: 'User progress not found' });
+        }
+
+        const { SolvedChallenges = [] } = userProgressSnap.data() || {};
+        if (!SolvedChallenges.includes(challengeId)) {
+            return res.status(400).json({ error: 'Challenge not completed yet' });
+        }
+
+        await userProgressRef.update({
+            [`retryCount.${challengeId}`]: admin.firestore.FieldValue.increment(1),
+            [`challengeAttempts.${challengeId}`]: { answers, score },
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        res.status(200).json({ message: 'Retry recorded' });
+    } catch (error) {
+        console.error('Error recording retry:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 })
