@@ -298,21 +298,21 @@ app.post('/api/addExample', verifyAdminToken, async (req, res) => {
 
 //update example
 app.put('/api/updateExample', verifyAdminToken,  async (req, res) => {
-    const { id, title, category, description, exampleData } = req.body;
+    const { id, title, category, description, examples } = req.body;
 
     if (!id) {
         console.error('Document ID is required')
         return res.status(400).json({ error: 'Document ID is required' });
     }
 
-    if (!title || !category || !description || !exampleData) {
+    if (!title || !category || !description || !examples) {
         console.error('All fields are required')
-        return res.status(400).json({ error: 'All fields are required' });
+        return res.status(400).json({error: 'All fields are required'});
     }
 
-    if (!Array.isArray(exampleData)) {
+    if (!Array.isArray(examples)) {
         console.error('codeData must be an array')
-        return res.status(400).json({ error: 'exampleData must be an array' });
+        return res.status(400).json({ error: 'examples must be an array' });
     }
 
     try {
@@ -329,7 +329,7 @@ app.put('/api/updateExample', verifyAdminToken,  async (req, res) => {
             title,
             category,
             description,
-            exampleData,
+            examples,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
