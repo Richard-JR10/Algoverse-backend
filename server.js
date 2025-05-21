@@ -682,6 +682,100 @@ app.post('/api/recordRetry', async (req, res) => {
     }
 });
 
+// GET /api/leaderboard endpoint
+app.get('/api/leaderboard', async (req, res) => {
+    try {
+        const currentUserUid = req.user.uid;
+
+        // Step 1: Fetch all users with UIDs and displayNames
+        const listUsersResult = await admin.auth().listUsers(1000);
+        let allUsers = listUsersResult.users;
+        let nextPageToken = listUsersResult.pageToken;
+        while (nextPageToken) {
+            const nextPage = await admin.auth().listUsers(1000, nextPageToken);
+            allUsers = allUsers.concat(nextPage.users);
+            nextPageToken = nextPage.pageToken;
+        }
+        const users = allUsers.map(user => ({
+            uid: user.uid,
+            displayName: user.displayName || 'Anonymous'
+        }));
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`Fetched ${users.length} users`);
+        }
+
+        // Step 2: Fetch points for each user
+        const userPointsPromises = users.map(async ({ uid, displayName }) => {
+            const userProgressDoc = await db.collection('userProgress').doc(uid).get();
+            const points = userProgressDoc.exists ? userProgressDoc.data().Points || 0 : 0;
+            return { uid, displayName, points };
+        });
+        const userPoints = await Promise.all(userPointsPromises);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('Fetched points for all users');
+        }
+
+        // Step 3: Sort by points (descending) and displayName (ascending) for equal points
+        userPoints.sort((a, b) => {
+            if (b.points !== a.points) {
+                return b.points - a.points; // Primary: Descending points
+            }
+            return a.displayName.localeCompare(b.displayName); // Secondary: Ascending displayName
+        });
+
+        // Step 4: Assign unique ranks and track current user's rank
+        const leaderboard = [];
+        let currentUserRank = null;
+
+        for (let i = 0; i < userPoints.length; i++) {
+            const user = userPoints[i];
+            const rank = i + 1; // Unique rank based on position
+
+            // Add to leaderboard if in top 10
+            if (leaderboard.length < 10) {
+                leaderboard.push({
+                    rank,
+                    displayName: user.displayName,
+                    points: user.points,
+                    uid: user.uid // For frontend key prop
+                });
+            }
+
+            // Track current user's rank
+            if (user.uid === currentUserUid) {
+                currentUserRank = rank;
+            }
+        }
+
+        // If current user not found in userPoints, assign last rank + 1
+        if (currentUserRank === null) {
+            currentUserRank = userPoints.length + 1;
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`Current user ${currentUserUid} not found in userPoints, assigned rank: ${currentUserRank}`);
+            }
+        }
+
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('Leaderboard generated:', { leaderboard, currentUserRank });
+        }
+
+        // Step 5: Return top 10 and current user's rank
+        res.status(200).json({
+            leaderboard,
+            currentUserRank
+        });
+    } catch (error) {
+        console.error('Error generating leaderboard:', {
+            message: error.message,
+            stack: error.stack
+        });
+        res.status(500).json({
+            error: 'Failed to generate leaderboard',
+            details: error.message
+        });
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 })
