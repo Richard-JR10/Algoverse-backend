@@ -451,7 +451,7 @@ app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
                 !Array.isArray(choices)
             ) {
                 return res.status(400).json({
-                    error: 'Fill In The Blanks requires text, exactly 2 correctAnswers, exactly 4 choices, and explanation',
+                    error: 'Fill In The Blanks requires text, correctAnswers, choices, and explanation',
                 });
             }
         }
