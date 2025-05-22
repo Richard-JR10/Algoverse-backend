@@ -21,7 +21,7 @@ app.use(cors({
 app.use(express.json());
 app.use(verifyUserToken);
 
-// Fetch all users
+// Fetch all users with providerData and lastSignInTime
 app.get('/api/users', verifyAdminToken, async (req, res) => {
     try {
         const listUsersResult = await admin.auth().listUsers(1000);
@@ -33,6 +33,14 @@ app.get('/api/users', verifyAdminToken, async (req, res) => {
             disabled: userRecord.disabled,
             photoURL: userRecord.photoURL || defaultPhotoURL,
             admin: userRecord.customClaims?.admin === true,
+            providerData: userRecord.providerData.map(provider => ({
+                providerId: provider.providerId,
+                email: provider.email,
+                displayName: provider.displayName,
+                photoURL: provider.photoURL,
+                phoneNumber: provider.phoneNumber
+            })),
+            lastSignInTime: userRecord.metadata.lastSignInTime
         }));
         res.status(200).json(users);
     } catch (error) {
