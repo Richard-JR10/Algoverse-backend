@@ -399,7 +399,7 @@ app.get('/api/challenges', async (req, res) => {
 // Add challenges
 app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
     const { title, category, questions, type, difficulty } = req.body;
-
+    console.log(type)
     // Validate request body
     if (!title || typeof title !== 'string' || title.trim() === '') {
         return res.status(400).json({ error: 'Title is required and must be a non-empty string' });
@@ -407,8 +407,8 @@ app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
         return res.status(400).json({ error: 'Request body must include a non-empty questions array' });
     }
-    if (!type || ![1, 2, 3].includes(type)) {
-        return res.status(400).json({ error: 'Type is required and must be 1, 2, or 3' });
+    if (!type || ![1, 2, 3, 4].includes(type)) {
+        return res.status(400).json({ error: 'Type is required and must be 1, 2, 3, or 4' });
     }
     if (!difficulty || !['Easy', 'Medium', 'Hard'].includes(difficulty)) {
         return res.status(400).json({ error: 'Difficulty is required and must be Easy, Medium, or Hard' });
@@ -452,6 +452,16 @@ app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
             ) {
                 return res.status(400).json({
                     error: 'Fill In The Blanks requires text, correctAnswers, choices, and explanation',
+                });
+            }
+        } else if (type === 4) {
+            const { left, right } = challenge;
+            if (
+                !left ||
+                !right
+            ) {
+                return res.status(400).json({
+                    error: 'Matching type requires Question and Answer',
                 });
             }
         }
