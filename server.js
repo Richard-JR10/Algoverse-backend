@@ -398,8 +398,9 @@ app.get('/api/challenges', async (req, res) => {
 
 // Add challenges
 app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
-    const { title, category, questions, type, difficulty } = req.body;
+    const { title, category, questions, type, difficulty, instruction } = req.body;
     console.log(type)
+
     // Validate request body
     if (!title || typeof title !== 'string' || title.trim() === '') {
         return res.status(400).json({ error: 'Title is required and must be a non-empty string' });
@@ -415,6 +416,11 @@ app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
     }
     if (!category || !['Sorting', 'Search', 'Graph Traversal', 'Recursion'].includes(category)) {
         return res.status(400).json({ error: 'Category is required and must be Sorting, Search, Graph Traversal, or Recursion' });
+    }
+
+    // Validate instruction for type 4
+    if (type === 4 && (!instruction || typeof instruction !== 'string' || instruction.trim() === '')) {
+        return res.status(400).json({ error: 'Instruction is required for Matching Type challenges' });
     }
 
     // Validate each question
@@ -456,27 +462,32 @@ app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
             }
         } else if (type === 4) {
             const { left, right } = challenge;
-            if (
-                !left ||
-                !right
-            ) {
+            if (!left || !right) {
                 return res.status(400).json({
-                    error: 'Matching type requires Question and Answer',
+                    error: 'Matching type requires left and right items',
                 });
             }
         }
     }
 
     try {
-        // Store all data in a single document
-        const docRef = await admin.firestore().collection('challenges').add({
+        // Build document data
+        const documentData = {
             title,
             category,
             questions,
             type,
             difficulty,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        };
+
+        // Only add instruction for type 4
+        if (type === 4) {
+            documentData.instruction = instruction;
+        }
+
+        // Store all data in a single document
+        const docRef = await admin.firestore().collection('challenges').add(documentData);
 
         res.status(201).json({
             message: 'Challenges added successfully',
@@ -489,8 +500,8 @@ app.post('/api/addChallenges', verifyAdminToken, async (req, res) => {
 });
 
 //update challenges
-app.put('/api/updateChallenges', verifyAdminToken,  async (req, res) => {
-    const { id, title, category, type, difficulty, questions } = req.body;
+app.put('/api/updateChallenges', verifyAdminToken, async (req, res) => {
+    const { id, title, category, type, difficulty, questions, instruction } = req.body;
 
     if (!id) {
         console.error('Document ID is required')
@@ -507,6 +518,11 @@ app.put('/api/updateChallenges', verifyAdminToken,  async (req, res) => {
         return res.status(400).json({ error: 'Questions must be an array' });
     }
 
+    // Validate instruction for type 4
+    if (type === 4 && (!instruction || typeof instruction !== 'string' || instruction.trim() === '')) {
+        return res.status(400).json({ error: 'Instruction is required for Matching Type challenges' });
+    }
+
     try {
         // Check if the document exists first
         const docRef = db.collection('challenges').doc(id);
@@ -516,15 +532,23 @@ app.put('/api/updateChallenges', verifyAdminToken,  async (req, res) => {
             return res.status(404).json({ error: 'Document not found' });
         }
 
-        // Update the document
-        await docRef.update({
+        // Build update data
+        const updateData = {
             title,
             category,
             type,
             difficulty,
             questions,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+        };
+
+        // Only add instruction for type 4
+        if (type === 4) {
+            updateData.instruction = instruction;
+        }
+
+        // Update the document
+        await docRef.update(updateData);
 
         res.status(200).json({
             message: 'Challenges data updated successfully',
@@ -534,7 +558,7 @@ app.put('/api/updateChallenges', verifyAdminToken,  async (req, res) => {
         console.error('Error updating challenges data:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-})
+});
 
 
 // delete challenges data
