@@ -596,8 +596,9 @@ app.post('/api/completeChallenge', async (req, res) => {
     if (points == null || typeof points !== 'number' || points < 0) {
         return res.status(400).json({ error: 'points is required and must be a positive number' });
     }
-    if (!Array.isArray(answers)) {
-        return res.status(400).json({ error: 'answers is required and must be an array' });
+    // Accept both arrays (Multiple Choice) and objects (Matching Type)
+    if (!answers || (typeof answers !== 'object')) {
+        return res.status(400).json({ error: 'answers is required and must be an array or object' });
     }
     if (score == null || typeof score !== 'number' || score < 0) {
         return res.status(400).json({ error: 'score is required and must be a non-negative number' });
@@ -683,8 +684,9 @@ app.post('/api/recordRetry', async (req, res) => {
     if (!challengeId || typeof challengeId !== 'string' || challengeId.trim() === '') {
         return res.status(400).json({ error: 'challengeId is required and must be a non-empty string' });
     }
-    if (!Array.isArray(answers)) {
-        return res.status(400).json({ error: 'answers is required and must be an array' });
+
+    if (!answers || (typeof answers !== 'object')) {
+        return res.status(400).json({ error: 'answers is required and must be an array or object' });
     }
     if (score == null || typeof score !== 'number' || score < 0) {
         return res.status(400).json({ error: 'score is required and must be a non-negative number' });
